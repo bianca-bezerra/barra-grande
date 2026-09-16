@@ -283,9 +283,9 @@
 </header>
 
 <nav>
-  <button class="tab-btn active" onclick="showPage('pessoal')">🧑‍🤝‍🧑 Turma</button>
-  <button class="tab-btn" onclick="showPage('itens')">🦐 Itens</button>
-  <button class="tab-btn" onclick="showPage('extrato')">🌊 Extrato</button>
+  <button class="tab-btn active" data-page="pessoal" onclick="showPage('pessoal')">🧑‍🤝‍🧑 Turma</button>
+  <button class="tab-btn" data-page="itens" onclick="showPage('itens')">🦐 Itens</button>
+  <button class="tab-btn" data-page="extrato" onclick="showPage('extrato')">🌊 Extrato</button>
 </nav>
 
 <!-- ════════════════ PESSOAL ════════════════ -->
@@ -439,6 +439,13 @@ let currentAba = 'Comida';
 let modalItemId = null;
 let nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
 
+// O Firebase às vezes devolve listas como objeto (ex: {"0":..,"1":..}) em vez de array de verdade
+function toArray(v) {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === 'object') return Object.values(v);
+  return [];
+}
+
 function recomputeNextId() {
   nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
 }
@@ -483,8 +490,8 @@ if (stateRef) {
     fbStatus('', false);
     const val = snapshot.val();
     if (val) {
-      state.pessoas = val.pessoas || [];
-      state.itens = val.itens || [];
+      state.pessoas = toArray(val.pessoas);
+      state.itens = toArray(val.itens);
       state.pagamentos = val.pagamentos || {};
       recomputeNextId();
       renderTudo();
@@ -507,7 +514,8 @@ function showPage(p) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  event.target.classList.add('active');
+  document.querySelector('.tab-btn[data-page="'+p+'"]').classList.add('active');
+  localStorage.setItem('barra-grande-pagina', p);
   if (p === 'pessoal') renderPessoas();
   if (p === 'itens')   renderItens();
   if (p === 'extrato') renderExtrato();
@@ -849,6 +857,7 @@ function togglePago(pessoa, itemId) {
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 renderTudo();
+showPage(localStorage.getItem('barra-grande-pagina') || 'pessoal');
 </script>
 </body>
 </html>
