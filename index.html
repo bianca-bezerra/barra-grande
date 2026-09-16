@@ -401,6 +401,11 @@ function fbStatus(msg, mostrar) {
   if (mostrar) console.error('[Firebase]', msg);
 }
 
+window.onerror = function(msg, source, lineno, colno) {
+  fbStatus('Erro no site: ' + msg + ' (linha ' + lineno + ')', true);
+  return false;
+};
+
 // ── FIREBASE ───────────────────────────────────────────────────────────────
 // Preencha com os valores do seu Firebase Console (veja o tutorial que te mandei)
 const firebaseConfig = {
@@ -434,17 +439,20 @@ let state = JSON.parse(localStorage.getItem('barra-grande-state') || 'null') || 
   pagamentos: {},    // {pessoaNome: {itemId: true/false}}
   fotos: {}          // {pessoaNome: 'data:image/jpeg;base64,...'}
 };
-let fotoTargetPessoa = null;
-let currentAba = 'Comida';
-let modalItemId = null;
-let nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
-
-// O Firebase às vezes devolve listas como objeto (ex: {"0":..,"1":..}) em vez de array de verdade
 function toArray(v) {
   if (Array.isArray(v)) return v;
   if (v && typeof v === 'object') return Object.values(v);
   return [];
 }
+function normalizeItens(itens) {
+  return toArray(itens).map(it => ({ ...it, quemConsome: toArray(it.quemConsome) }));
+}
+state.pessoas = toArray(state.pessoas);
+state.itens = normalizeItens(state.itens);
+let fotoTargetPessoa = null;
+let currentAba = 'Comida';
+let modalItemId = null;
+let nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
 
 function recomputeNextId() {
   nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
@@ -485,14 +493,20 @@ function saveFotos() {
 }
 
 // Sempre que QUALQUER pessoa mudar itens/pessoas/pagamentos, todo mundo recebe e re-renderiza
+let migrouFotosAntigas = false;
 if (stateRef) {
   stateRef.on('value', snapshot => {
     fbStatus('', false);
     const val = snapshot.val();
     if (val) {
       state.pessoas = toArray(val.pessoas);
-      state.itens = toArray(val.itens);
+      state.itens = normalizeItens(val.itens);
       state.pagamentos = val.pagamentos || {};
+      // Compatibilidade: versões antigas guardavam as fotos junto aqui dentro
+      if (!migrouFotosAntigas && val.fotos && Object.keys(val.fotos).length && fotosRef) {
+        migrouFotosAntigas = true;
+        fotosRef.set(val.fotos);
+      }
       recomputeNextId();
       renderTudo();
     }
