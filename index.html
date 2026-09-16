@@ -359,7 +359,7 @@
     <div class="aba-toggle">
       <button id="toggle-com" class="on" onclick="setAba('Comida')">🍤 Comida</button>
       <button id="toggle-beb" onclick="setAba('Bebida')">🍹 Bebida</button>
-      <button id="toggle-sup" onclick="setAba('Suprimentos')">🧹 Outros</button>
+      <button id="toggle-sup" onclick="setAba('Suprimentos')">🧹 Suprimentos</button>
     </div>
 
     <div class="form-row">
@@ -452,7 +452,7 @@ const firebaseConfig = {
   messagingSenderId: "743802005173",
   appId: "1:743802005173:web:6adb8aada6c19432a6c0fc"
 };
-  
+
 let stateRef = null;
 let fotosRef = null;
 try {
@@ -883,11 +883,12 @@ function renderExtrato() {
     ).map(it => ({
       id: it.id, aba: it.aba, nome: it.nome,
       valor: valorPessoa(it),
-      pagarA: it.quemPagou || null
+      pagarA: it.quemPagou || null,
+      autoPago: it.quemPagou === pessoa // pagou o item, não precisa pagar pra si mesmo
     }));
     const total = consumos.reduce((s,c) => s+c.valor, 0);
     const pago  = state.pagamentos[pessoa] || {};
-    const totalPago = consumos.filter(c => pago[c.id]).reduce((s,c) => s+c.valor, 0);
+    const totalPago = consumos.filter(c => c.autoPago || pago[c.id]).reduce((s,c) => s+c.valor, 0);
     return { pessoa, consumos, total, totalPago, falta: total - totalPago };
   });
 
@@ -931,13 +932,15 @@ function renderExtrato() {
             <div class="extrato-item">
               <div class="item-info">
                 <div class="item-name">${c.nome}</div>
-                <div class="item-meta">${c.aba}${c.pagarA ? ' · pagar a <strong>'+c.pagarA+'</strong>' : ''}</div>
+                <div class="item-meta">${c.aba}${c.pagarA && !c.autoPago ? ' · pagar a <strong>'+c.pagarA+'</strong>' : ''}${c.autoPago ? ' · você mesmo pagou' : ''}</div>
               </div>
               <div style="display:flex;align-items:center;gap:.75rem">
                 <span class="item-val">${fmt(c.valor)}</span>
-                <button class="pago-btn ${pago[c.id]?'pago':''}" onclick="togglePago('${e.pessoa.replace(/'/g,"\\'")}',${c.id})">
-                  ${pago[c.id]?'✓ pago':'pagar'}
-                </button>
+                ${c.autoPago
+                  ? '<span class="badge green">✓ já é seu</span>'
+                  : `<button class="pago-btn ${pago[c.id]?'pago':''}" onclick="togglePago('${e.pessoa.replace(/'/g,"\\'")}',${c.id})">
+                       ${pago[c.id]?'✓ pago':'pagar'}
+                     </button>`}
               </div>
             </div>`).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 1.25rem;background:var(--surface2)">
