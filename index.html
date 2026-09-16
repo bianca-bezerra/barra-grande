@@ -276,15 +276,17 @@
     /* Tabela de itens vira lista de cartões no celular */
     table thead { display: none; }
     table, table tbody, table tr, table td { display: block; width: 100%; }
-    table tr { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+    table tr { padding: 1rem .9rem; border-bottom: 1px solid var(--border); }
     table tfoot tr { border-bottom: none; }
     table td {
-      border-bottom: none; padding: 4px 0;
+      border-bottom: 1px dashed rgba(140,122,84,.16); padding: 9px 0;
       display: flex; justify-content: space-between; align-items: center; gap: .75rem; text-align: right;
     }
-    table td::before { content: attr(data-label); font-size: 11px; color: var(--muted); font-weight: 600; text-align: left; }
-    table .item-acoes { justify-content: flex-end; gap: .5rem; }
+    table td:last-child { border-bottom: none; }
+    table td::before { content: attr(data-label); font-size: 11.5px; color: var(--muted); font-weight: 600; text-align: left; }
+    table .item-acoes { justify-content: flex-end; gap: .6rem; padding-top: 12px; }
     table .item-acoes::before { content: none; }
+    table .item-acoes button { flex: 0 0 auto; padding: 8px 16px; }
 
     /* Turma: cartões maiores, mais fácil de tocar */
     .pessoa-card { padding: .35rem 1rem .35rem .35rem; }
@@ -691,6 +693,7 @@ function populateSelects() {
 
 // ── ADICIONAR ITEM ─────────────────────────────────────────────────────────
 let editingItemId = null;
+let extratoAbertos = new Set();
 
 function addItem() {
   const nome  = document.getElementById('inp-nome').value.trim();
@@ -903,9 +906,10 @@ function renderExtrato() {
 
   el.innerHTML = extrato.map(e => {
     const pago = state.pagamentos[e.pessoa] || {};
+    const aberto = extratoAbertos.has(e.pessoa);
     return `
     <div class="extrato-pessoa">
-      <div class="extrato-header" onclick="toggleExtrato(this)">
+      <div class="extrato-header" onclick="toggleExtrato(this, '${e.pessoa.replace(/'/g,"\\'")}')">
         <div style="display:flex;align-items:center;gap:.75rem">
           <div class="pessoa-avatar">${avatarInner(e.pessoa)}</div>
           <div>
@@ -917,10 +921,10 @@ function renderExtrato() {
           ${e.falta <= 0
             ? '<span class="badge green">✓ quitado</span>'
             : `<span style="font-size:11px;color:var(--muted)">falta</span><span class="total-val">${fmt(e.falta)}</span>`}
-          <span class="chevron">▼</span>
+          <span class="chevron${aberto?' open':''}">▼</span>
         </div>
       </div>
-      <div class="extrato-body">
+      <div class="extrato-body${aberto?' open':''}">
         ${e.consumos.length === 0
           ? '<div style="padding:1rem 1.25rem;color:var(--muted);font-size:13px">Nenhum item.</div>'
           : e.consumos.map(c => `
@@ -945,11 +949,12 @@ function renderExtrato() {
   }).join('');
 }
 
-function toggleExtrato(header) {
+function toggleExtrato(header, pessoa) {
   const body = header.nextElementSibling;
   const chev = header.querySelector('.chevron');
-  body.classList.toggle('open');
-  chev.classList.toggle('open');
+  const abrindo = body.classList.toggle('open');
+  chev.classList.toggle('open', abrindo);
+  if (abrindo) extratoAbertos.add(pessoa); else extratoAbertos.delete(pessoa);
 }
 
 function togglePago(pessoa, itemId) {
