@@ -414,12 +414,14 @@ const firebaseConfig = {
 };
 
 let stateRef = null;
+let fotosRef = null;
 try {
   if (firebaseConfig.apiKey.includes('COLE_')) {
     fbStatus('Firebase ainda não configurado (chaves de exemplo no firebaseConfig). Salvando só neste navegador.', true);
   } else {
     firebase.initializeApp(firebaseConfig);
     stateRef = firebase.database().ref('viagem-barra-grande/state');
+    fotosRef = firebase.database().ref('viagem-barra-grande/fotos');
   }
 } catch (err) {
   fbStatus('Erro ao iniciar o Firebase: ' + err.message, true);
@@ -448,32 +450,55 @@ function renderTudo() {
   renderExtrato();
 }
 
-// Salva sempre local (garantido) e tenta salvar no Firebase (se configurado)
+// Salva sempre local (garantido) e junta mudanças rápidas num único envio ao Firebase
+let saveTimer = null;
 function save() {
   localStorage.setItem('barra-grande-state', JSON.stringify(state));
   if (!stateRef) return;
-  stateRef.set(state)
-    .then(() => fbStatus('', false))
-    .catch(err => fbStatus('Não consegui salvar no Firebase: ' + err.message + ' (dados de igual salvos só neste navegador)', true));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const { pessoas, itens, pagamentos } = state;
+    stateRef.set({ pessoas, itens, pagamentos })
+      .then(() => fbStatus('', false))
+      .catch(err => fbStatus('Não consegui salvar no Firebase: ' + err.message + ' (dados de igual salvos só neste navegador)', true));
+  }, 400);
 }
 
-// Sempre que QUALQUER pessoa mudar algo, todo mundo recebe e re-renderiza
+// Fotos vão num caminho separado (payload menor, muda bem menos que itens/pagamentos)
+let saveFotosTimer = null;
+function saveFotos() {
+  localStorage.setItem('barra-grande-state', JSON.stringify(state));
+  if (!fotosRef) return;
+  clearTimeout(saveFotosTimer);
+  saveFotosTimer = setTimeout(() => {
+    fotosRef.set(state.fotos)
+      .then(() => fbStatus('', false))
+      .catch(err => fbStatus('Não consegui salvar a foto no Firebase: ' + err.message, true));
+  }, 400);
+}
+
+// Sempre que QUALQUER pessoa mudar itens/pessoas/pagamentos, todo mundo recebe e re-renderiza
 if (stateRef) {
   stateRef.on('value', snapshot => {
     fbStatus('', false);
     const val = snapshot.val();
     if (val) {
-      state = {
-        pessoas: val.pessoas || [],
-        itens: val.itens || [],
-        pagamentos: val.pagamentos || {},
-        fotos: val.fotos || {}
-      };
+      state.pessoas = val.pessoas || [];
+      state.itens = val.itens || [];
+      state.pagamentos = val.pagamentos || {};
       recomputeNextId();
       renderTudo();
     }
   }, err => {
     fbStatus('Não consegui ler do Firebase: ' + err.message + ' (provavelmente as Regras do banco ainda não liberam leitura)', true);
+  });
+}
+
+if (fotosRef) {
+  fotosRef.on('value', snapshot => {
+    state.fotos = snapshot.val() || {};
+    renderPessoas();
+    renderExtrato();
   });
 }
 
@@ -519,6 +544,7 @@ function removePessoa(nome) {
   delete state.pagamentos[nome];
   delete state.fotos[nome];
   save();
+  saveFotos();
   renderPessoas();
   populateSelects();
 }
@@ -558,7 +584,7 @@ function handleFotoSelected(event) {
       const w = img.width * scale, h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
       state.fotos[nome] = canvas.toDataURL('image/jpeg', 0.85);
-      save();
+      saveFotos();
       renderPessoas();
     };
     img.src = ev.target.result;
@@ -570,7 +596,7 @@ function handleFotoSelected(event) {
 function removeFoto(nome, ev) {
   ev.stopPropagation();
   delete state.fotos[nome];
-  save();
+  saveFotos();
   renderPessoas();
 }
 
