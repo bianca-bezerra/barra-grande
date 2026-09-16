@@ -266,6 +266,8 @@
     .page-badge { width: 50px; height: 50px; }
   }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -390,20 +392,58 @@
 <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="handleFotoSelected(event)">
 
 <script>
+// ── FIREBASE ───────────────────────────────────────────────────────────────
+// Preencha com os valores do seu Firebase Console (veja o tutorial que te mandei)
+const firebaseConfig = {
+    apiKey: "AIzaSyAKkp1UhnHMjARsAbog1av4NgllDPR7iNs",
+    authDomain: "barragrande-29468.firebaseapp.com",
+    databaseURL: "https://barragrande-29468-default-rtdb.firebaseio.com",
+    projectId: "barragrande-29468",
+    storageBucket: "barragrande-29468.firebasestorage.app",
+    messagingSenderId: "92937387452",
+    appId: "1:92937387452:web:7e1c8771f91d3e1a38bfb9",
+};
+firebase.initializeApp(firebaseConfig);
+const stateRef = firebase.database().ref('viagem-barra-grande/state');
+
 // ── STATE ──────────────────────────────────────────────────────────────────
-let state = JSON.parse(localStorage.getItem('barra-grande-state') || 'null') || {
+let state = {
   pessoas: [],      // ['Fernanda', 'Sávio', ...]
   itens: [],        // {id, aba, nome, qtd, und, preco, quemPagou, quemConsome[], comprado}
   pagamentos: {},    // {pessoaNome: {itemId: true/false}}
   fotos: {}          // {pessoaNome: 'data:image/jpeg;base64,...'}
 };
-if (!state.fotos) state.fotos = {};
 let fotoTargetPessoa = null;
 let currentAba = 'Comida';
 let modalItemId = null;
-let nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
+let nextId = 1;
 
-function save() { localStorage.setItem('barra-grande-state', JSON.stringify(state)); }
+function recomputeNextId() {
+  nextId = state.itens.length ? Math.max(...state.itens.map(i=>i.id)) + 1 : 1;
+}
+
+function renderTudo() {
+  populateSelects();
+  renderPessoas();
+  renderItens();
+  renderExtrato();
+}
+
+// Toda alteração local é gravada no Firebase, que devolve pra todo mundo conectado
+function save() { stateRef.set(state); }
+
+// Sempre que QUALQUER pessoa mudar algo, todo mundo recebe e re-renderiza
+stateRef.on('value', snapshot => {
+  const val = snapshot.val();
+  state = {
+    pessoas: (val && val.pessoas) || [],
+    itens: (val && val.itens) || [],
+    pagamentos: (val && val.pagamentos) || {},
+    fotos: (val && val.fotos) || {}
+  };
+  recomputeNextId();
+  renderTudo();
+});
 
 // ── NAVEGAÇÃO ──────────────────────────────────────────────────────────────
 function showPage(p) {
@@ -750,8 +790,7 @@ function togglePago(pessoa, itemId) {
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────
-populateSelects();
-renderPessoas();
+renderTudo();
 </script>
 </body>
 </html>
